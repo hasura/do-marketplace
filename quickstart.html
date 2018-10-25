@@ -1,0 +1,152 @@
+<h2>Quickstart</h2>
+
+<p>Once the Hasura GraphQL Engine One-Click Droplet is ready, you can visit the Droplet IP to open Hasura console, where you can create tables, explore GraphQL APIs etc. Note that it might take 1 or 2 minutes for everything to start running.</p>
+
+<p>The Hasura console will be at:
+  <pre>
+    http://your_droplet_ip/console
+  </pre>
+</p>
+
+<p>The GraphQL Endpoint will be:
+  <pre>
+    http://your_droplet_ip/v1alpha1/graphql
+  </pre>
+</p>
+
+<p>You can follow <a href=”https://docs.hasura.io/1.0/graphql/manual/getting-started/first-graphql-query.html”>this guide</a> to get started with Hasura.</p>
+
+<p>For more details checkout the <a href=”https://docs.hasura.io”>official docs</a>.</p>
+
+<p>A Postgres database is also provisioned on the Droplet. </p>
+
+<h2>Secure the GraphQL endpoint</h2>
+
+<p>By default Hasura is exposed without any access key. Anyone can read and write to your database using GraphQL. When deploying to production, you should secure the endpoint by adding an access key and then setting up permission rules on tables.</p>
+
+<p>To add the access key, follow the steps given below:
+  <ol>
+    <li>Connect to the Droplet via SSH:
+      <pre>
+        ssh root@your_droplet_ip
+      </pre>
+    </li>
+    <li>Goto <code>/etc/hasura</code> directory:
+      <pre>
+        cd /etc/hasura
+      </pre>
+    </li>
+    <li>Edit <code>docker-compose.yaml</code> and un-comment the line that mentions access key. Also change it to some unique secret:
+      <pre>
+        vim docker-compose.yaml
+
+        ...
+        # un-comment next line to add an access key
+        HASURA_GRAPHQL_ACCESS_KEY: mysecretaccesskey
+        ...
+
+        # type ESC followed by :wq to save and quit
+      </pre>
+    </li>
+    <li>Update the container:
+      <pre>
+        docker-compose up -d
+      </pre>
+    </li>
+  </ol>
+</p>
+
+<p>That's it. Visit the console at <code>http://your_droplet_ip/console</code> and it should prompt for the access key. Further API requests can be made by adding the following header:
+  <pre>
+    X-Hasura-Access-Key: mysecretaccesskey
+  </pre>
+</p>
+
+<h2>Enabling HTTPS</h2>
+
+<p>If you own a domain, you can enable HTTPS on this Droplet by mapping the domain to the Droplet IP. The One-Click Droplet is configured with <a href="https://caddyserver.com/">Caddy</a> which is an HTTP/2 web server with automatic HTTPS using <a href="https://letsencrypt.org/">Let's Encrypt</a>.</p>
+
+<ol>
+  <li>Go to your domain's DNS dashboard and add an A record mapping the domain to the Droplet IP.</li>
+  <li>Connect to the Droplet via SSH:
+    <pre>
+        ssh root@your_droplet_ip
+    </pre>
+  </li>
+  <li>Goto <code>/etc/hasura</code> directory:
+    <pre>
+        cd /etc/hasura
+    </pre>
+  </li>
+  <li>Edit <code>Caddyfile</code> and change <code>:80</code> to your domain:
+    <pre>
+        vim Caddyfile
+
+        ...
+        add_your-domain-here {
+          proxy / graphql-engine:8080 {
+            websocket
+          }
+        }
+        ...
+
+        # type ESC followed by :wq to save and quit
+    </pre>
+  </li>
+  <li>Restart the container:
+    <pre>
+        docker-compose restart caddy
+    </pre>
+  </li>
+</ol>
+
+
+<p>Now, visit <code>https://your_domain/console</code> to visit the Hasura console.</p>
+
+<h2>Updating to latest version</h2>
+
+<p>When a new version of GraphQL Engine is released, you can upgrade to it by just changing the version tag in <code>docker-compose.yaml</code>. You can find the latest releases in the <a href="https://github.com/hasura/graphql-engine/releases">GitHub releases page</a>.</p>
+
+<ol>
+  <li>Connect to the Droplet via SSH:
+    <pre>
+        ssh root@your_droplet_ip
+    </pre>
+  </li>
+  <li>Goto <code>/etc/hasura</code> directory:
+    <pre>
+        cd /etc/hasura
+    </pre>
+  </li>
+  <li>Edit <code>docker-compose.yaml</code> and change the image tag to the latest one:
+    <pre>
+        vim docker-compose.yaml
+
+        ...
+        graphql-engine:
+          image: hasura/graphql-engine:latest_tag_here
+        ...
+
+        # type ESC followed by :wq to save and quit
+    </pre>
+  </li>
+  <li>Restart the container:
+    <pre>
+        docker-compose up -d
+    </pre>
+  </li>
+</ol>
+
+<h2 id="logs">Troubleshooting & Logs</h2>
+
+<p>You can use the following command to see what containers are running on the Droplet:
+  <pre>
+    docker ps
+  </pre>
+</p>
+
+<p>To checks logs for any contaier, use the follwing command:
+  <pre>
+    docker logs container_id_or_name
+  </pre>
+</p>
