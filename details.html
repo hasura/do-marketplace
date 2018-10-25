@@ -1,0 +1,70 @@
+<div style="margin-bottom: 20px;">
+  <h3>Open Hasura console</h3>
+
+  Once Hasura GraphQL Engine One-Click Droplet is ready, you can visit the Droplet IP to open Hasura console, where you can create tables, explore GraphQL APIs etc. Note that it might take 1 or 2 minutes for everything to start running.
+
+  The Hasura console will be at:
+
+  http://your_droplet_ip/console
+
+  The GraphQL Endpoint will be:
+
+  http://your_droplet_ip/v1alpha1/graphql
+
+  A Postgres database is also provisioned on the Droplet. Using the console, you can create a table on this Postgres instance and make your first GraphQL query.
+
+  Here are some quick steps to run your first GraphQL query:
+  <ol>
+    <li>Open console: visit the Droplet IP in a browser to open Hasura console.</li>
+    <li>
+      Create a table:
+
+      Navigate to Data -> Create table on the console and create a table called profile with the following columns:
+      <pre>
+      profile
+      column name 	type
+      id 	Integer (auto-increment)
+      name 	Text
+      <pre>
+
+      Choose id as the Primary key and click the Create button.
+    </li>
+    <li>
+      Insert sample data:
+
+      Once the table is created, go to the Insert Row tab and insert some sample rows:
+
+      Thor
+      Iron Man
+      Hulk
+      Captain America
+      Black Widow
+
+    </li>
+    <li>
+      Try out GraphQL:
+
+      Switch to the GraphiQL tab on top and execute the following GraphQL query:
+
+      <pre>
+      query {
+      profile {
+      id
+      name
+      }
+      }
+      </pre>
+    </li>
+  </ol>
+</div>
+
+<div style="margin-bottom: 20px;">
+  Next steps:
+  <ul>
+    <li><a href="https://docs.hasura.io/1.0/graphql/manual/guides/deployment/digital-ocean-one-click.html#logs">View logs</a></li>
+    <li><a href="https://docs.hasura.io/1.0/graphql/manual/guides/deployment/digital-ocean-one-click.html#secure-the-graphql-endpoint">Secure the GraphQL endpoint</a></li>
+    <li><a href="https://docs.hasura.io/1.0/graphql/manual/guides/deployment/digital-ocean-one-click.html#adding-a-domain-enabling-https">Adding a domain & Enabling HTTPS</a></li>
+    <li><a href="https://docs.hasura.io/1.0/graphql/manual/guides/deployment/digital-ocean-one-click.html#updating-to-latest-version">Updating to latest version</a></li>
+    <li><a href="https://docs.hasura.io/1.0/graphql/manual/guides/deployment/digital-ocean-one-click.html#using-a-different-database">Using a different database</a></li>
+  </ul>
+</div>
