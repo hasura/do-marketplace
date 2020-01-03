@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# create the hasura directory
+echo "==> Creating hasura directory"
+mkdir -p /etc/hasura
+
+# download docker-compose.yaml
+echo "==> Downloading docker-compose file"
+wget -nc -O /etc/hasura/docker-compose.yaml https://graphql-engine-cdn.hasura.io/install-manifests/do-one-click/docker-compose.yaml
+
+# download Caddyfile
+echo "==> Downloading Caddyfile"
+wget -nc -O /etc/hasura/Caddyfile https://graphql-engine-cdn.hasura.io/install-manifests/do-one-click/Caddyfile
+
+# start the containers
+echo "==> Starting the containers"
+docker-compose -f /etc/hasura/docker-compose.yaml up -d
