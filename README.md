@@ -15,5 +15,3 @@ Running `packer build -var-file=variables.json template.json` will do the follow
 * Create a build droplet.
 * Clean and verify the droplet.
 * Shut down and snapshot the droplet.
-
-> Note: To avoid failure make sure all the scripts executable before running the packer build command.
