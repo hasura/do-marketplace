@@ -1,7 +1,5 @@
 #!/bin/bash
 
-apt-get -y update
-apt-get -y upgrade
 rm -rf /tmp/* /var/tmp/*
 history -c
 cat /dev/null > /root/.bash_history
