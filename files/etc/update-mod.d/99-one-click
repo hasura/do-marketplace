@@ -21,7 +21,8 @@ All ports are BLOCKED except 22 (SSH), 80 (HTTP) and 443 (HTTPS).
 * Secure the endpoint by adding an access key (https://goo.gl/YdMvaj)
 
 * Hasura configuration files are present at /etc/hasura
-For feedback and support, join our Discord server at https://discord.gg/3FNQnWj
+
+For feedback and support, join our Discord server at https://discord.gg/hasura
 
 Visit https://hasura.io for more information.
 
