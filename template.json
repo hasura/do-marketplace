@@ -44,7 +44,6 @@
     {
       "type": "shell",
       "scripts": [
-        "scripts/01-test",
         "scripts/90-cleanup.sh",
         "scripts/99-img_check.sh"
       ]
