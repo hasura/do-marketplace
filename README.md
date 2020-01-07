@@ -10,7 +10,13 @@ The `template.json` is the single source configuration packer will use to build 
 
 To run this the scripts that this template uses, you'll need to [install Packer](https://www.packer.io/intro/getting-started/install.html) and create a [DigitalOcean personal access token](https://www.digitalocean.com/docs/api/create-personal-access-token/) and then add the token in the `variables.json`.
 
-Running `packer build -var-file=variables.json template.json` will do the following
+Run
+
+```
+packer build -var-file=variables.json template.json
+``` 
+
+It will do the following:
 
 * Create a build droplet.
 * Clean and verify the droplet.
