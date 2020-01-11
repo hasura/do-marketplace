@@ -16,9 +16,10 @@
   ],
   "provisioners": [
     {
-      "type": "file",
-      "source": "files/etc/",
-      "destination": "/etc/"
+      "type": "shell",
+      "inline": [
+        "cloud-init status --wait"
+      ]
     },
     {
       "type": "file",
@@ -26,10 +27,9 @@
       "destination": "/var/"
     },
     {
-      "type": "shell",
-      "inline": [
-        "cloud-init status --wait"
-      ]
+      "type": "file",
+      "source": "files/etc/",
+      "destination": "/etc/"
     },
     {
       "type": "shell",
