@@ -4,18 +4,29 @@
 # © 2018 DigitalOcean LLC.
 # This code is licensed under MIT license (see LICENSE.txt for details)
 #
-VERSION="v. 0.01"
+VERSION="v. 1.2"
+RUNDATE=$( date )
 
 # Script should be run with SUDO
 if [ "$EUID" -ne 0 ]
   then echo "[Error] - This script must be run with sudo or as the root user."
-  exit
+  exit 1
 fi
 
 STATUS=0
 PASS=0
 WARN=0
 FAIL=0
+
+# $1 == command to check for
+# returns: 0 == true, 1 == false
+cmdExists() {
+    if command -v "$1" > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 function getDistro {
     if [ -f /etc/os-release ]; then
@@ -55,37 +66,71 @@ fi
 function loadPasswords {
 SHADOW=$(cat /etc/shadow)
 }
+
+function checkAgent {
+  # Check for the presence of the do-agent in the filesystem
+  if [ -d /var/opt/digitalocean/do-agent ];then
+     echo -en "\e[41m[FAIL]\e[0m DigitalOcean Monitoring Agent detected.\n"
+            ((FAIL++))
+            STATUS=2
+      if [[ $OS == "CentOS Linux" ]]; then
+        echo "The agent can be removed with 'sudo yum remove do-agent' "
+      elif [[ $OS == "Ubuntu" ]]; then
+        echo "The agent can be removed with 'sudo apt-get purge do-agent' "
+      fi
+  else
+    echo -en "\e[32m[PASS]\e[0m DigitalOcean Monitoring agent was not found\n"
+    ((PASS++)) 
+  fi
+}
+
 function checkLogs {
+    cp_ignore="/var/log/cpanel-install.log"
     echo -en "\nChecking for log files in /var/log\n\n"
     # Check if there are log archives or log files that have not been recently cleared.
     for f in /var/log/*-????????; do
       [[ -e $f ]] || break
-      echo -en "\e[93m[WARN]\e[0m Log archive ${f} found\n"
-      ((WARN++))
-      if [[ $STATUS != 2 ]]; then
-        
-          STATUS=1
+      if [ $f != $cp_ignore ]; then
+        echo -en "\e[93m[WARN]\e[0m Log archive ${f} found\n"
+        ((WARN++))
+        if [[ $STATUS != 2 ]]; then
+          
+            STATUS=1
+        fi
       fi
     done
     for f in  /var/log/*.[0-9];do
       [[ -e $f ]] || break
-      echo -en "\e[93m[WARN]\e[0m Log archive ${f} found\n"
-      ((WARN++))
-      if [[ $STATUS != 2 ]]; then
-        
-          STATUS=1
-      fi
+       
+        echo -en "\e[93m[WARN]\e[0m Log archive ${f} found\n"
+        ((WARN++))
+        if [[ $STATUS != 2 ]]; then
+          
+            STATUS=1
+        fi
+      
     done
     for f in /var/log/*.log; do
       [[ -e $f ]] || break
-      if [ "$( cat "${f}" | wc -c)" -gt 50 ]; then
-          echo -en "\e[93m[WARN]\e[0m un-cleared log file, ${f} found\n"
-          ((WARN++))
-          if [[ $STATUS != 2 ]]; then
-        
-          STATUS=1
+      if [[ "${f}" = '/var/log/lfd.log' && "$( cat "${f}" | egrep -v '/var/log/messages has been reset| Watching /var/log/messages' | wc -c)" -gt 50 ]]; then
+        if [ $f != $cp_ignore ]; then
+        echo -en "\e[93m[WARN]\e[0m un-cleared log file, ${f} found\n"
+        ((WARN++))
+        if [[ $STATUS != 2 ]]; then
+          
+            STATUS=1
+        fi
       fi
+      elif [[ "${f}" != '/var/log/lfd.log' && "$( cat "${f}" | wc -c)" -gt 50 ]]; then
+      if [ $f != $cp_ignore ]; then
+        echo -en "\e[93m[WARN]\e[0m un-cleared log file, ${f} found\n"
+        ((WARN++))
+        if [[ $STATUS != 2 ]]; then
+          
+            STATUS=1
+        fi
       fi
+    fi
     done
 }
 function checkTMP {
@@ -99,7 +144,7 @@ function checkRoot {
     do
       IFS=':' read -r -a u <<< "$usr"
       if [[ "${u[0]}" == "${user}" ]]; then
-        if [[ ${u[1]} == "!" ]] || [[ ${u[1]} == "*" ]]; then
+        if [[ ${u[1]} == "!" ]] || [[ ${u[1]} == "!!" ]] || [[ ${u[1]} == "*" ]]; then
             echo -en "\e[32m[PASS]\e[0m User ${user} has no password set.\n"
             ((PASS++))
         else
@@ -118,10 +163,21 @@ function checkRoot {
                             
                                 if [ "$( cat "${key}" | wc -c)" -gt 50 ]; then
                                     echo -en "\e[41m[FAIL]\e[0m User \e[1m${user}\e[0m has a populated authorized_keys file in \e[93m${key}\e[0m\n"
+                                    akey=$(cat ${key})
+                                    echo "File Contents:"
+                                    echo $akey
+                                    echo "--------------"
                                     ((FAIL++))
                                     STATUS=2
                                 fi
-                            
+                            elif  [ "${key}" != "${uhome}/.ssh/id_rsa" ]; then
+                                    echo -en "\e[41m[FAIL]\e[0m User \e[1m${user}\e[0m has a private key file in \e[93m${key}\e[0m\n"
+                                    akey=$(cat ${key})
+                                    echo "File Contents:"
+                                    echo $akey
+                                    echo "--------------"
+                                    ((FAIL++))
+                                    STATUS=2
                             elif  [ "${key}" != "${uhome}/.ssh/known_hosts" ]; then
                                 
                                  echo -en "\e[93m[WARN]\e[0m User \e[1m${user}\e[0m has a file in their .ssh directory at \e[93m${key}\e[0m\n"
@@ -192,7 +248,7 @@ function checkUsers {
         do
           IFS=':' read -r -a u <<< "$usr"
           if [[ "${u[0]}" == "${user}" ]]; then
-              if [[ ${u[1]} == "!" ]] || [[ ${u[1]} == "*" ]]; then
+              if [[ ${u[1]} == "!" ]] || [[ ${u[1]} == "!!" ]] || [[ ${u[1]} == "*" ]]; then
                   echo -en "\e[32m[PASS]\e[0m User ${user} has no password set.\n"
                   ((PASS++))
               else
@@ -218,9 +274,22 @@ function checkUsers {
                             
                                 if [ "$( cat "${key}" | wc -c)" -gt 50 ]; then
                                     echo -en "\e[41m[FAIL]\e[0m User \e[1m${user}\e[0m has a populated authorized_keys file in \e[93m${key}\e[0m\n"
+                                    akey=$(cat ${key})
+                                    echo "File Contents:"
+                                    echo $akey
+                                    echo "--------------"
                                     ((FAIL++))
                                     STATUS=2
                                 fi
+                              elif  [ "${key}" != "${uhome}/.ssh/id_rsa" ]; then
+                                echo -en "\e[41m[FAIL]\e[0m User \e[1m${user}\e[0m has a private key file in \e[93m${key}\e[0m\n"
+                                    akey=$(cat ${key})
+                                    echo "File Contents:"
+                                    echo $akey
+                                    echo "--------------"
+                                    ((FAIL++))
+                                    STATUS=2
+                           
                             elif  [ "${key}" != "${uhome}/.ssh/known_hosts" ]; then
                                 
                                  echo -en "\e[93m[WARN]\e[0m User \e[1m${user}\e[0m has a file in their .ssh directory named \e[93m${key}\e[0m\n"
@@ -273,31 +342,98 @@ function checkFirewall {
     
     if [[ $OS == "Ubuntu" ]]; then
       fw="ufw"
-      service ufw status >/dev/null 2>&1
-    elif [[ $OS == "CentOS Linux" ]]; then
-      fw="firewalld"
-      systemctl status firewalld >/dev/null 2>&1
-    fi
-    
-    if [ $? = 0 ]; then
+      ufwa=$(ufw status |head -1| sed -e "s/^Status:\ //")
+      if [[ $ufwa == "active" ]]; then
         FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
         ((PASS++))
-    else
-         FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+      else
+        FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
+      fi
+    elif [[ $OS == "CentOS Linux" ]]; then
+      if [ -f /usr/lib/systemd/system/csf.service ]; then
+        fw="csf"
+        if [[ $(systemctl status $fw >/dev/null 2>&1) ]]; then
+          
+        FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+        ((PASS++))
+        elif cmdExists "firewall-cmd"; then
+          if [[ $(systemctl is-active firewalld >/dev/null 2>&1 && echo 1 || echo 0) ]]; then
+           FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+          ((PASS++))
+          else
+            FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
           ((WARN++))
-        if [[ $STATUS != 2 ]]; then
-            STATUS=1
+          fi
+        else
+          FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
         fi
+      else
+        fw="firewalld"
+        if [[ $(systemctl is-active firewalld >/dev/null 2>&1 && echo 1 || echo 0) ]]; then
+          FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+        ((PASS++))
+        else
+          FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
+        fi
+      fi
+    elif [[ "$OS" =~ Debian.* ]]; then
+      # user could be using a number of different services for managing their firewall
+      # we will check some of the most common
+      if cmdExists 'ufw'; then
+        fw="ufw"
+        ufwa=$(ufw status | sed -e "s/^Status:\ //")
+        if [[ $ufwa == "active" ]]; then
+        FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+        ((PASS++))
+      else
+        FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
+      fi
+      elif cmdExists "firewall-cmd"; then
+        fw="firewalld"
+        if [[ $(systemctl is-active --quiet $fw) ]]; then
+          FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+        ((PASS++))
+        else
+          FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
+        fi
+      else
+        # user could be using vanilla iptables, check if kernel module is loaded
+        fw="iptables"
+        if [[ $(lsmod | grep -q '^ip_tables' 2>/dev/null) ]]; then
+          FW_VER="\e[32m[PASS]\e[0m Firewall service (${fw}) is active\n"
+        ((PASS++))
+        else
+          FW_VER="\e[93m[WARN]\e[0m No firewall is configured. Ensure ${fw} is installed and configured\n"
+        ((WARN++))
+        fi
+      fi
     fi
     
 }
 function checkUpdates {
-    if [[ $OS == "Ubuntu" ]]; then
+    if [[ $OS == "Ubuntu" ]] || [[ "$OS" =~ Debian.* ]]; then
         echo -en "\nUpdating apt package database to check for security updates, this may take a minute...\n\n"
         apt-get -y update > /dev/null
-        update_count=$(/usr/lib/update-notifier/apt-check 2>&1 | cut -d ';' -f 2)
+  
+        uc=$(apt-get --just-print upgrade | grep -i "security" | wc -l)
+        if [[ $uc -gt 0 ]]; then
+          update_count=$(( ${uc} / 2 ))
+        else
+          update_count=0
+        fi
+          
         if [[ $update_count -gt 0 ]]; then
             echo -en "\e[41m[FAIL]\e[0m There are ${update_count} security updates available for this image that have not been installed.\n"
+            echo -en
+            echo -en "Here is a list of the security updates that are not installed:\n"
+            sleep 2
+            apt-get --just-print upgrade | grep -i security | awk '{print $2}' | awk '!seen[$0]++'
+            echo -en
             ((FAIL++))
             STATUS=2
         else
@@ -317,7 +453,7 @@ function checkUpdates {
         fi
     else
         echo "Error encountered"
-        exit
+        exit 1
     fi
 
     return 1;    
@@ -334,9 +470,90 @@ function checkCloudInit {
     fi    
     return 1
 }
+function checkMongoDB {
+  # Check if MongoDB is installed
+  # If it is, verify the version is allowed (non-SSPL)
+  
+   if [[ $OS == "Ubuntu" ]] || [[ "$OS" =~ Debian.* ]]; then
+
+     if [[ -f "/usr/bin/mongod" ]]; then
+       version=$(/usr/bin/mongod --version --quiet | grep "db version" | sed -e "s/^db\ version\ v//")
+      
+      if version_gt $version 4.0.0; then
+        if version_gt $version 4.0.3; then
+          echo -en "\e[41m[FAIL]\e[0m An SSPL version of MongoDB is present, ${version}"
+          ((FAIL++))
+           STATUS=2
+        else
+          echo -en "\e[32m[PASS]\e[0m The version of MongoDB installed, ${version} is not under the SSPL"
+          ((PASS++))
+        fi
+      else
+         if version_gt $version 3.6.8; then
+          echo -en "\e[41m[FAIL]\e[0m An SSPL version of MongoDB is present, ${version}"
+          ((FAIL++))
+           STATUS=2
+        else
+          echo -en "\e[32m[PASS]\e[0m The version of MongoDB installed, ${version} is not under the SSPL"
+          ((PASS++))
+        fi
+      fi
+     
+     
+     else
+       echo -en "\e[32m[PASS]\e[0m MongoDB is not installed"
+       ((PASS++))
+     fi
+     
+   elif [[ $OS == "CentOS Linux" ]]; then
+
+    if [[ -f "/usr/bin/mongod" ]]; then
+       version=$(/usr/bin/mongod --version --quiet | grep "db version" | sed -e "s/^db\ version\ v//")
+       
+         
+       if version_gt $version 4.0.0; then
+        if version_gt $version 4.0.3; then
+          echo -en "\e[41m[FAIL]\e[0m An SSPL version of MongoDB is present"
+          ((FAIL++))
+           STATUS=2
+        else
+          echo -en "\e[32m[PASS]\e[0m The version of MongoDB installed is not under the SSPL"
+          ((PASS++))
+        fi
+      else
+         if version_gt $version 3.6.8; then
+          echo -en "\e[41m[FAIL]\e[0m An SSPL version of MongoDB is present"
+          ((FAIL++))
+           STATUS=2
+        else
+          echo -en "\e[32m[PASS]\e[0m The version of MongoDB installed is not under the SSPL"
+          ((PASS++))
+        fi
+      fi
+     
+     
+     
+     else
+       echo -en "\e[32m[PASS]\e[0m MongoDB is not installed"
+       ((PASS++))
+     fi
+    
+  else
+    echo "ERROR: Unable to identify distribution"
+    ((FAIL++))
+    STATUS 2
+    return 1
+  fi
+     
+  
+}
+
+function version_gt() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
+
 
 clear
 echo "DigitalOcean Marketplace Image Validation Tool ${VERSION}"
+echo "Executed on: ${RUNDATE}"
 echo "Checking local system for Marketplace compatibility..."
 
 getDistro
@@ -357,6 +574,20 @@ if [[ $OS == "Ubuntu" ]]; then
         osv=0
     fi
     
+elif [[ "$OS" =~ Debian.* ]]; then
+    ost=1
+    case "$VER" in
+        9)
+            osv=1
+            ;;
+        10)
+            osv=1
+            ;;
+        *)
+            osv=2
+            ;;
+    esac
+
 elif [[ $OS == "CentOS Linux" ]]; then
         ost=1
      if [[ $VER == "7" ]]; then
@@ -388,7 +619,7 @@ elif [[ $ost == 1 ]]; then
     STATUS=2
 else
     echo "Exiting..."
-    exit
+    exit 1
 fi
 
 checkCloudInit
@@ -411,6 +642,10 @@ checkUsers
 echo -en "\n\nChecking the root account...\n"
 checkRoot
 
+checkAgent
+
+checkMongoDB
+
 
 # Summary
 echo -en "\n\n---------------------------------------------------------------------------------------------------\n"
@@ -426,13 +661,15 @@ echo "--------------------------------------------------------------------------
 echo -en "\e[1m${PASS} Tests PASSED\e[0m\n"
 echo -en "\e[1m${WARN} WARNINGS\e[0m\n"
 echo -en "\e[1m${FAIL} Tests FAILED\e[0m\n"
-
 echo -en "---------------------------------------------------------------------------------------------------\n"
 
 if [[ $STATUS == 0 ]]; then
     echo -en "We did not detect any issues with this image. Please be sure to manually ensure that all software installed on the base system is functional, secure and properly configured (or facilities for configuration on first-boot have been created).\n\n"
+    exit 0
 elif [[ $STATUS == 1 ]]; then
     echo -en "Please review all [WARN] items above and ensure they are intended or resolved.  If you do not have a specific requirement, we recommend resolving these items before image submission\n\n"
+    exit 1
 else
     echo -en "Some critical tests failed.  These items must be resolved and this scan re-run before you submit your image to the marketplace.\n\n"
+    exit 1
 fi

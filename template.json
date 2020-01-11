@@ -1,0 +1,52 @@
+{
+  "variables": {
+    "token":"",
+    "image_name": "hasura-marketplace-snapshot-{{timestamp}}"
+  },
+  "builders": [
+    {
+      "type": "digitalocean",
+      "api_token": "{{user `token`}}",
+      "image": "docker-18-04",
+      "region": "blr1",
+      "size": "s-1vcpu-1gb",
+      "ssh_username": "root",
+      "snapshot_name": "{{user `image_name`}}"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "cloud-init status --wait"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "files/var/",
+      "destination": "/var/"
+    },
+    {
+      "type": "file",
+      "source": "files/etc/",
+      "destination": "/etc/"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "rm -rvf /var/lib/apt/lists/*",
+        "mv /var/lib/dpkg/status /var/lib/dpkg/status-bad",
+        "cp /var/lib/dpkg/status-old /var/lib/dpkg/status",
+        "DEBIAN_FRONTEND=noninteractive apt-get update -y",
+        "DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y"
+      ]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "scripts/90-cleanup.sh",
+        "scripts/99-img_check.sh"
+      ]
+    }
+  ]
+}
